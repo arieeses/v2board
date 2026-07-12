@@ -29,13 +29,50 @@ class Shadowrocket
         $uri .= "STATUS=🚀↑:{$upload}GB,↓:{$download}GB,TOT:{$totalTraffic}GB💡Expires:{$expiredDate}\r\n";
 
         foreach ($this->servers as $server) {
-            if ($server['type'] === 'vmess' || ($server['type'] === 'v2node' && $server['protocol'] === 'vmess')) {
+            $realType = ($server['type'] === 'v2node' && isset($server['protocol'])) ? $server['protocol'] : $server['type'];
+            if ($realType === 'vmess') {
                 $uri .= self::buildVmess($user['uuid'], $server);
+            } elseif ($realType === 'shadowsocks') {
+                $uri .= self::buildShadowsocks($user['uuid'], $server);
             } else {
                 $uri .= Helper::buildUri($this->user['uuid'], $server);
             }
         }
         return base64_encode($uri);
+    }
+
+    // Shadowrocket does NOT understand SIP003 `plugin=shadow-tls` in an ss:// URI.
+    // It uses its own scheme: ss://b64(cipher:pw)@host:port?shadow-tls=b64(JSON),
+    // where the JSON is {"version","password","host","port","address"}.
+    // Non-shadow-tls SS falls back to the generic ss:// builder.
+    public static function buildShadowsocks($uuid, $server)
+    {
+        $p = Helper::ssPlugin($server);
+        if ($p === null || $p['plugin'] !== 'shadow-tls') {
+            return Helper::buildShadowsocksUri($uuid, $server);
+        }
+        $cipher = $server['cipher'];
+        if (strpos($cipher, '2022-blake3') !== false) {
+            $length = $cipher === '2022-blake3-aes-128-gcm' ? 16 : 32;
+            $serverKey = Helper::getServerKey($server['created_at'], $length);
+            $userKey = Helper::uuidToBase64($uuid, $length);
+            $password = "{$serverKey}:{$userKey}";
+        } else {
+            $password = $uuid;
+        }
+        $userinfo = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode("{$cipher}:{$password}"));
+        $opts = $p['opts'];
+        $stlsConfig = json_encode([
+            'version'  => (string)($opts['version'] ?? '3'),
+            'password' => (string)($opts['password'] ?? ''),
+            'host'     => (string)($opts['host'] ?? ''),
+            'port'     => (string)$server['port'],
+            'address'  => (string)$server['host'],
+        ], JSON_UNESCAPED_SLASHES);
+        $stlsB64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($stlsConfig));
+        $name = rawurlencode($server['name']);
+        $host = Helper::formatHost($server['host']);
+        return "ss://{$userinfo}@{$host}:{$server['port']}?shadow-tls={$stlsB64}#{$name}\r\n";
     }
 
     public static function buildVmess($uuid, $server)
