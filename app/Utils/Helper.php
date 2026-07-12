@@ -259,8 +259,22 @@ class Helper
                     'host' => $opts['host'] ?? '',
                     'path' => $opts['path'] ?? '/',
                 ]];
+            case 'shadow-tls':
+                $out = ['plugin' => 'shadow-tls', 'plugin-opts' => [
+                    'host'     => $opts['host'] ?? '',
+                    'password' => $opts['password'] ?? '',
+                    'version'  => (int) ($opts['version'] ?? 3),
+                ]];
+                // client-fingerprint is a proxy-level (uTLS) option, sibling of
+                // plugin — NOT a plugin-opts key. Default chrome; fingerprint=none
+                // disables it.
+                $fp = $opts['fingerprint'] ?? ($opts['fp'] ?? 'chrome');
+                if ($fp !== '' && strtolower($fp) !== 'none') {
+                    $out['client-fingerprint'] = $fp;
+                }
+                return $out;
             default:
-                // shadow-tls / restls: pass parsed opts through (version as int).
+                // restls / others: pass parsed opts through (version as int).
                 if (isset($opts['version'])) {
                     $opts['version'] = (int) $opts['version'];
                 }

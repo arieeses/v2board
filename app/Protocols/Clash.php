@@ -109,6 +109,9 @@ class Clash
         if (($pluginConf = \App\Utils\Helper::ssPluginClash($server)) !== null) {
             $array['plugin'] = $pluginConf['plugin'];
             $array['plugin-opts'] = $pluginConf['plugin-opts'];
+            if (isset($pluginConf['client-fingerprint'])) {
+                $array['client-fingerprint'] = $pluginConf['client-fingerprint'];
+            }
             return $array;
         }
         if (isset($server['obfs']) && $server['obfs'] === 'http') {
