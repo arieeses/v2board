@@ -62,12 +62,14 @@ class Shadowrocket
         }
         $userinfo = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode("{$cipher}:{$password}"));
         $opts = $p['opts'];
+        // Omit address/port: shadow-tls shares the SS public port (sing-box fronts
+        // it), so Shadowrocket defaults the plugin endpoint to the main server
+        // (host:port). Sending address=<node> makes Shadowrocket mis-map it into
+        // the plugin "地址" field. host here is the TLS SNI.
         $stlsConfig = json_encode([
             'version'  => (string)($opts['version'] ?? '3'),
             'password' => (string)($opts['password'] ?? ''),
             'host'     => (string)($opts['host'] ?? ''),
-            'port'     => (string)$server['port'],
-            'address'  => (string)$server['host'],
         ], JSON_UNESCAPED_SLASHES);
         $stlsB64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($stlsConfig));
         $name = rawurlencode($server['name']);
