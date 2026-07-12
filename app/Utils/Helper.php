@@ -196,6 +196,78 @@ class Helper
         return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? "[$host]" : $host;
     }
 
+    /**
+     * Parse an SS SIP003 plugin config carried in a v2node node's
+     * network_settings ({"plugin":"...","plugin_opts":"k=v;k=v"}). This reuses
+     * the existing 传输协议「编辑配置」JSON editor — no new DB column, no new
+     * admin input box. Returns ['plugin'=>string,'opts_str'=>string,'opts'=>array]
+     * or null when no plugin is configured.
+     */
+    public static function ssPlugin($server)
+    {
+        $ns = $server['network_settings'] ?? null;
+        if (!is_array($ns)) {
+            return null;
+        }
+        $plugin = $ns['plugin'] ?? null;
+        $optsStr = $ns['plugin_opts'] ?? null;
+        if (empty($plugin) || empty($optsStr)) {
+            return null;
+        }
+        $opts = [];
+        foreach (explode(';', $optsStr) as $pair) {
+            $pair = trim($pair);
+            if ($pair === '') {
+                continue;
+            }
+            if (strpos($pair, '=') === false) {
+                $opts[$pair] = true;
+                continue;
+            }
+            [$k, $v] = explode('=', $pair, 2);
+            $opts[trim($k)] = trim($v);
+        }
+        return ['plugin' => $plugin, 'opts_str' => $optsStr, 'opts' => $opts];
+    }
+
+    /**
+     * Map an SS plugin config to the Clash/mihomo plugin + plugin-opts shape.
+     * Mirrors Xboard: obfs and v2ray-plugin are mapped explicitly; shadow-tls /
+     * restls fall through with their parsed key/values as plugin-opts.
+     */
+    public static function ssPluginClash($server)
+    {
+        $p = self::ssPlugin($server);
+        if ($p === null) {
+            return null;
+        }
+        $opts = $p['opts'];
+        switch ($p['plugin']) {
+            case 'obfs':
+                $po = [
+                    'mode' => $opts['obfs'] ?? 'http',
+                    'host' => $opts['obfs-host'] ?? '',
+                ];
+                if (isset($opts['path'])) {
+                    $po['path'] = $opts['path'];
+                }
+                return ['plugin' => 'obfs', 'plugin-opts' => $po];
+            case 'v2ray-plugin':
+                return ['plugin' => 'v2ray-plugin', 'plugin-opts' => [
+                    'mode' => $opts['mode'] ?? 'websocket',
+                    'tls'  => isset($opts['tls']) && $opts['tls'] == 'true',
+                    'host' => $opts['host'] ?? '',
+                    'path' => $opts['path'] ?? '/',
+                ]];
+            default:
+                // shadow-tls / restls: pass parsed opts through (version as int).
+                if (isset($opts['version'])) {
+                    $opts['version'] = (int) $opts['version'];
+                }
+                return ['plugin' => $p['plugin'], 'plugin-opts' => $opts];
+        }
+    }
+
     public static function buildShadowsocksUri($uuid, $server)
     {
         $cipher = $server['cipher'];
@@ -211,7 +283,11 @@ class Helper
         $str = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode("{$cipher}:{$password}"));
         $add = self::formatHost($server['host']);
         $uri = "ss://{$str}@{$add}:{$server['port']}";
-        if ($server['obfs'] == 'http') {
+        if (($p = self::ssPlugin($server)) !== null) {
+            // SIP003 plugin (shadow-tls / v2ray-plugin / obfs) in the ss:// URI.
+            $pluginName = $p['plugin'] === 'obfs' ? 'obfs-local' : $p['plugin'];
+            $uri .= '?plugin=' . rawurlencode($pluginName . ';' . $p['opts_str']);
+        } else if ($server['obfs'] == 'http') {
             $uri .= "?plugin=obfs-local;obfs=http;obfs-host={$server['obfs-host']};path={$server['obfs-path']}";
         } else if ((($server['network'] ?? null) == 'http') && isset($server['network_settings']['Host'])) {
             $path = $server['network_settings']['path'] ?? '/';

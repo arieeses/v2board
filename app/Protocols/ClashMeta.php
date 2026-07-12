@@ -129,6 +129,12 @@ class ClashMeta
         $array['cipher'] = $server['cipher'];
         $array['password'] = $password;
         $array['udp'] = true;
+        // SS plugin (shadow-tls / v2ray-plugin / obfs) carried in network_settings.
+        if (($pluginConf = \App\Utils\Helper::ssPluginClash($server)) !== null) {
+            $array['plugin'] = $pluginConf['plugin'];
+            $array['plugin-opts'] = $pluginConf['plugin-opts'];
+            return $array;
+        }
         if (isset($server['obfs']) && $server['obfs'] === 'http') {
             $array['plugin'] = 'obfs';
             $plugin_opts = [

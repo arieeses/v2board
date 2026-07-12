@@ -117,6 +117,12 @@ class Singbox
         $array['method'] = $server['cipher'];
         $array['password'] = $password;
         $array['domain_resolver'] = 'local';
+        // SS plugin (v2ray-plugin / obfs) passthrough from network_settings.
+        if (($p = Helper::ssPlugin($server)) !== null) {
+            $array['plugin'] = $p['plugin'] === 'obfs' ? 'obfs-local' : $p['plugin'];
+            $array['plugin_opts'] = $p['opts_str'];
+            return $array;
+        }
         if (isset($server['obfs']) && $server['obfs'] === 'http') {
             $array['plugin'] = 'obfs-local';
             $plugin_opts_parts = [];
