@@ -29,18 +29,22 @@ class Shadowrocket
         $uri .= "STATUS=🚀↑:{$upload}GB,↓:{$download}GB,TOT:{$totalTraffic}GB💡Expires:{$expiredDate}\r\n";
 
         foreach ($this->servers as $server) {
+            // -------- [shadow-tls / SS插件  修改] 原版只分流 vmess;这里加了 shadowsocks 分支 --------
             $realType = ($server['type'] === 'v2node' && isset($server['protocol'])) ? $server['protocol'] : $server['type'];
             if ($realType === 'vmess') {
                 $uri .= self::buildVmess($user['uuid'], $server);
             } elseif ($realType === 'shadowsocks') {
-                $uri .= self::buildShadowsocks($user['uuid'], $server);
+                $uri .= self::buildShadowsocks($user['uuid'], $server);   // ← 新增分支(走下面新增的方法)
             } else {
                 $uri .= Helper::buildUri($this->user['uuid'], $server);
             }
+            // -------- 修改结束 --------
         }
         return base64_encode($uri);
     }
 
+    // ==================== [shadow-tls / SS插件  新增开始] ====================
+    // 以下 buildShadowsocks 方法是本功能新增,原版没有。
     // Shadowrocket does NOT understand SIP003 `plugin=shadow-tls` in an ss:// URI.
     // It uses its own scheme: ss://b64(cipher:pw)@host:port?shadow-tls=b64(JSON),
     // where the JSON is {"version","password","host","port","address"}.
@@ -78,6 +82,7 @@ class Shadowrocket
         $host = Helper::formatHost($server['host']);
         return "ss://{$userinfo}@{$host}:{$server['port']}?shadow-tls={$stlsB64}#{$name}\r\n";
     }
+    // ==================== [shadow-tls / SS插件  新增结束] ====================
 
     public static function buildVmess($uuid, $server)
     {

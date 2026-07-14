@@ -196,6 +196,8 @@ class Helper
         return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? "[$host]" : $host;
     }
 
+    // ==================== [shadow-tls / SS插件  新增开始] ====================
+    // 以下两个方法(ssPlugin / ssPluginClash)是本功能新增,原版没有。
     /**
      * Parse an SS SIP003 plugin config carried in a v2node node's
      * network_settings ({"plugin":"...","plugin_opts":"k=v;k=v"}). This reuses
@@ -281,6 +283,7 @@ class Helper
                 return ['plugin' => $p['plugin'], 'plugin-opts' => $opts];
         }
     }
+    // ==================== [shadow-tls / SS插件  新增结束] ====================
 
     public static function buildShadowsocksUri($uuid, $server)
     {
@@ -297,11 +300,12 @@ class Helper
         $str = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode("{$cipher}:{$password}"));
         $add = self::formatHost($server['host']);
         $uri = "ss://{$str}@{$add}:{$server['port']}";
+        // -------- [shadow-tls / SS插件  新增] ss:// 带上 plugin 参数 --------
         if (($p = self::ssPlugin($server)) !== null) {
             // SIP003 plugin (shadow-tls / v2ray-plugin / obfs) in the ss:// URI.
             $pluginName = $p['plugin'] === 'obfs' ? 'obfs-local' : $p['plugin'];
             $uri .= '?plugin=' . rawurlencode($pluginName . ';' . $p['opts_str']);
-        } else if ($server['obfs'] == 'http') {
+        } else if ($server['obfs'] == 'http') {  // -------- 以下为原版逻辑 --------
             $uri .= "?plugin=obfs-local;obfs=http;obfs-host={$server['obfs-host']};path={$server['obfs-path']}";
         } else if ((($server['network'] ?? null) == 'http') && isset($server['network_settings']['Host'])) {
             $path = $server['network_settings']['path'] ?? '/';

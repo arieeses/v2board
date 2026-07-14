@@ -105,7 +105,8 @@ class Clash
         $array['cipher'] = $server['cipher'];
         $array['password'] = $uuid;
         $array['udp'] = true;
-        // SS plugin (shadow-tls / v2ray-plugin / obfs) carried in network_settings.
+        // ==================== [shadow-tls / SS插件  新增开始] ====================
+        // 读 network_settings.plugin,输出 shadow-tls / v2ray-plugin / obfs(含 client-fingerprint)
         if (($pluginConf = \App\Utils\Helper::ssPluginClash($server)) !== null) {
             $array['plugin'] = $pluginConf['plugin'];
             $array['plugin-opts'] = $pluginConf['plugin-opts'];
@@ -114,6 +115,7 @@ class Clash
             }
             return $array;
         }
+        // ==================== [shadow-tls / SS插件  新增结束] ====================
         if (isset($server['obfs']) && $server['obfs'] === 'http') {
             $array['plugin'] = 'obfs';
             $plugin_opts = [
